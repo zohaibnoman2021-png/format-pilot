@@ -6,18 +6,42 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "new:post": "node ./scripts/new-post.mjs"
   },
   "dependencies": {
+    "@mantine/core": "^8.3.5",
+    "@mantine/hooks": "^8.3.5",
+    "cloudinary": "^2.8.0",
+    "framer-motion": "^12.23.24",
+    "gray-matter": "^4.0.3",
+    "json-2-csv": "^5.5.9",
+    "lucide-react": "^0.546.0",
+    "markdown-it": "^14.1.0",
+    "marked": "^16.4.1",
+    "next": "15.5.6",
+    "papaparse": "^5.5.3",
+    "quill": "^2.0.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.6"
+    "react-dropzone": "^14.3.8",
+    "react-markdown": "^10.1.0",
+    "react-markdown-editor-lite": "^1.3.4",
+    "react-quilljs": "^2.0.5",
+    "react-syntax-highlighter": "^16.0.0",
+    "remark-gfm": "^4.0.1",
+    "slugify": "^1.6.6",
+    "xml-js": "^1.6.11",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4.1.16",
+    "@tailwindcss/typography": "^0.5.19",
+    "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.5.6",
-    "@eslint/eslintrc": "^3"
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.16"
   }
 }
