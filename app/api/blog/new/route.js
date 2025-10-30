@@ -9,22 +9,34 @@ cloudinary.config({
 
 export async function POST(req) {
   try {
-    const data = await req.json();
-    const { title, slug, content, author, featuredImage, featuredAlt } = data;
+    // ✅ Parse multipart form data (since frontend uses FormData)
+    const form = await req.formData();
+
+    const title = form.get("title");
+    const slug = form.get("slug");
+    const author = form.get("author");
+    const excerpt = form.get("excerpt");
+    const tags = form.get("tags");
+    const category = form.get("category");
+    const content = form.get("content");
+    const featuredImage = form.get("featuredImage");
+    const featuredAlt = form.get("featuredAlt");
 
     if (!title || !slug || !content) {
       return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 });
     }
 
     const date = new Date().toISOString().split("T")[0];
-    const excerpt = content.substring(0, 150).replace(/\n/g, " ") + "...";
+    const excerptText = excerpt || content.substring(0, 150).replace(/\n/g, " ") + "...";
 
     const mdContent = `---
 title: "${title}"
 slug: "${slug}"
 date: "${date}"
 author: "${author || "Admin"}"
-excerpt: "${excerpt}"
+excerpt: "${excerptText}"
+category: "${category || ""}"
+tags: ${JSON.stringify(tags?.split(",").map(t => t.trim()) || [])}
 featuredImage: "${featuredImage || ""}"
 featuredAlt: "${featuredAlt || ""}"
 ---
@@ -32,7 +44,7 @@ featuredAlt: "${featuredAlt || ""}"
 ${content}
 `;
 
-    // ✅ Upload Markdown to Cloudinary as a raw file
+    // ✅ Upload the Markdown file to Cloudinary (raw file)
     const uploadResult = await cloudinary.uploader.upload(
       `data:text/markdown;base64,${Buffer.from(mdContent).toString("base64")}`,
       {
