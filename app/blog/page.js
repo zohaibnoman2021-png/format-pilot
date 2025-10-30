@@ -1,32 +1,15 @@
 import Link from "next/link";
+import { getAllPostsMeta } from "../../lib/blog";
 
-export const revalidate = 0; // Always fetch fresh posts
+export const revalidate = 60;
 
 export const metadata = {
   title: "Blog | Format Pilot",
-  description:
-    "Tutorials, updates, and guides for data formatting and text utilities.",
+  description: "Tutorials, updates, and guides for data formatting and text utilities.",
 };
 
-async function getPosts() {
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/blog/list`,
-      {
-        cache: "no-store",
-      }
-    );
-    const data = await res.json();
-    if (!data.success) return [];
-    return data.posts;
-  } catch (err) {
-    console.error("Error loading posts:", err);
-    return [];
-  }
-}
-
 export default async function BlogIndex() {
-  const posts = await getPosts();
+  const posts = await getAllPostsMeta(); // now async Cloudinary call
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -36,7 +19,7 @@ export default async function BlogIndex() {
       </p>
 
       {posts.length === 0 ? (
-        <p className="text-gray-500">No blog posts yet.</p>
+        <p className="text-gray-500">No blog posts yet. Check back soon!</p>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
           {posts.map((post) => (
@@ -53,7 +36,6 @@ export default async function BlogIndex() {
                   loading="lazy"
                 />
               )}
-
               <h2 className="text-xl font-semibold text-indigo-600">
                 {post.title}
               </h2>
@@ -61,9 +43,7 @@ export default async function BlogIndex() {
                 {new Date(post.date).toLocaleDateString()} •{" "}
                 {post.author || "Admin"}
               </p>
-              <p className="text-gray-600 mt-3">
-                {post.excerpt || "No summary available."}
-              </p>
+              <p className="text-gray-600 mt-3">{post.excerpt}</p>
             </Link>
           ))}
         </div>
