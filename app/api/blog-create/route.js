@@ -1,36 +1,58 @@
-import fs from "fs";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
 import { NextResponse } from "next/server";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(req) {
   try {
     const data = await req.json();
-    const { title, slug, content, author } = data;
+    const { title, slug, content, author, featuredImage, featuredAlt } = data;
 
     if (!title || !slug || !content) {
-      return NextResponse.json({ success: false, message: "Missing fields" }, { status: 400 });
+      return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 });
     }
 
-    const blogDir = path.join(process.cwd(), "content", "blog");
-    if (!fs.existsSync(blogDir)) fs.mkdirSync(blogDir, { recursive: true });
-
     const date = new Date().toISOString().split("T")[0];
+    const excerpt = content.substring(0, 150).replace(/\n/g, " ") + "...";
+
+    // 🧠 Generate Markdown content
     const mdContent = `---
 title: "${title}"
 slug: "${slug}"
 date: "${date}"
 author: "${author || "Admin"}"
-excerpt: "${content.substring(0, 120)}..."
+excerpt: "${excerpt}"
+featuredImage: "${featuredImage || ""}"
+featuredAlt: "${featuredAlt || ""}"
 ---
 
 ${content}
 `;
 
-    fs.writeFileSync(path.join(blogDir, `${slug}.md`), mdContent);
+    // 🧩 Upload Markdown as a raw file to Cloudinary
+    const uploadResult = await cloudinary.uploader.upload(
+      `data:text/markdown;base64,${Buffer.from(mdContent).toString("base64")}`,
+      {
+        folder: "format-pilot/posts",
+        public_id: slug,
+        resource_type: "raw", // important for text files
+        overwrite: true,
+      }
+    );
 
-    return NextResponse.json({ success: true });
+    console.log("✅ Uploaded post to Cloudinary:", uploadResult.secure_url);
+
+    return NextResponse.json({
+      success: true,
+      url: uploadResult.secure_url,
+      message: "Blog post published successfully!",
+    });
   } catch (error) {
-    console.error("Blog create error:", error);
-    return NextResponse.json({ success: false, message: "Error creating blog" }, { status: 500 });
+    console.error("❌ Error publishing post:", error);
+    return NextResponse.json({ success: false, message: "Error publishing blog" }, { status: 500 });
   }
 }

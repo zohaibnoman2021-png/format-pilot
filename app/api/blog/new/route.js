@@ -1,6 +1,5 @@
-import fs from "fs";
-import path from "path";
 import { v2 as cloudinary } from "cloudinary";
+import { NextResponse } from "next/server";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,46 +9,49 @@ cloudinary.config({
 
 export async function POST(req) {
   try {
-    const formData = await req.formData();
-    const title = formData.get("title");
-    const slug = formData.get("slug");
-    const author = formData.get("author") || "Admin";
-    const excerpt = formData.get("excerpt") || "";
-    const category = formData.get("category") || "";
-    const tags = formData.get("tags") || "";
-    const content = formData.get("content") || "";
-    const featuredImage = formData.get("featuredImage");
-    const featuredAlt = formData.get("featuredAlt") || ""; // 🆕
+    const data = await req.json();
+    const { title, slug, content, author, featuredImage, featuredAlt } = data;
+
+    if (!title || !slug || !content) {
+      return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 });
+    }
 
     const date = new Date().toISOString().split("T")[0];
-    const tagsArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
+    const excerpt = content.substring(0, 150).replace(/\n/g, " ") + "...";
 
-    const imageUrl = typeof featuredImage === "string" ? featuredImage : "";
-
-    const frontmatter = `---
+    const mdContent = `---
 title: "${title}"
 slug: "${slug}"
 date: "${date}"
-author: "${author}"
+author: "${author || "Admin"}"
 excerpt: "${excerpt}"
-category: "${category}"
-tags: ${JSON.stringify(tagsArray)}
-featuredImage: "${imageUrl}"
-featuredAlt: "${featuredAlt}"
+featuredImage: "${featuredImage || ""}"
+featuredAlt: "${featuredAlt || ""}"
 ---
 
 ${content}
 `;
 
-    const dir = path.join(process.cwd(), "content", "blog");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    // ✅ Upload Markdown to Cloudinary as a raw file
+    const uploadResult = await cloudinary.uploader.upload(
+      `data:text/markdown;base64,${Buffer.from(mdContent).toString("base64")}`,
+      {
+        folder: "format-pilot/posts",
+        public_id: slug,
+        resource_type: "raw",
+        overwrite: true,
+      }
+    );
 
-    const filePath = path.join(dir, `${slug}.md`);
-    fs.writeFileSync(filePath, frontmatter, "utf8");
+    console.log("✅ Uploaded post to Cloudinary:", uploadResult.secure_url);
 
-    return Response.json({ success: true, post: { slug, title, imageUrl, filePath } });
+    return NextResponse.json({
+      success: true,
+      url: uploadResult.secure_url,
+      message: "Blog post published successfully!",
+    });
   } catch (error) {
-    console.error("Error creating post:", error);
-    return Response.json({ success: false, error: error.message }, { status: 500 });
+    console.error("❌ Error publishing post:", error);
+    return NextResponse.json({ success: false, message: "Error publishing blog" }, { status: 500 });
   }
 }
