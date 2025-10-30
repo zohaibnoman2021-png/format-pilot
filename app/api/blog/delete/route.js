@@ -1,21 +1,33 @@
-import fs from "fs";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
+import { NextResponse } from "next/server";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
-    if (!slug) return Response.json({ error: "Slug is required" }, { status: 400 });
 
-    const filePath = path.join(process.cwd(), "content", "blog", `${slug}.md`);
-    if (!fs.existsSync(filePath))
-      return Response.json({ error: "File not found" }, { status: 404 });
+    if (!slug) {
+      return NextResponse.json({ success: false, message: "Missing slug" }, { status: 400 });
+    }
 
-    fs.unlinkSync(filePath);
+    // ✅ Delete the .md file from Cloudinary
+    const publicId = `format-pilot/posts/${slug}`;
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
 
-    return Response.json({ success: true, message: "Post deleted successfully" });
+    if (result.result !== "ok") {
+      return NextResponse.json({ success: false, message: "Failed to delete file on Cloudinary" }, { status: 400 });
+    }
+
+    console.log(`✅ Deleted post: ${slug}`);
+    return NextResponse.json({ success: true, message: "Post deleted successfully" });
   } catch (error) {
-    console.error("Error deleting post:", error);
-    return Response.json({ success: false, error: error.message }, { status: 500 });
+    console.error("❌ Error deleting post:", error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }

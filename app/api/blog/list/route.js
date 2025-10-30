@@ -1,26 +1,46 @@
-import fs from "fs";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
+import { NextResponse } from "next/server";
 import matter from "gray-matter";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function GET() {
   try {
-    const blogDir = path.join(process.cwd(), "content", "blog");
-    if (!fs.existsSync(blogDir)) return Response.json({ posts: [] });
+    // ✅ Fetch all Markdown files in your Cloudinary folder
+    const results = await cloudinary.search
+      .expression("resource_type:raw AND folder=format-pilot/posts")
+      .sort_by("created_at", "desc")
+      .max_results(100)
+      .execute();
 
-    const files = fs.readdirSync(blogDir).filter((f) => f.endsWith(".md"));
-    const posts = files.map((file) => {
-      const content = fs.readFileSync(path.join(blogDir, file), "utf8");
-      const { data } = matter(content);
-      return {
-        title: data.title || "Untitled",
-        slug: data.slug || file.replace(".md", ""),
-        date: data.date || new Date().toISOString(),
-      };
-    });
+    // ✅ Parse front matter for each Markdown file
+    const posts = await Promise.all(
+      results.resources.map(async (file) => {
+        const res = await fetch(file.secure_url);
+        const text = await res.text();
+        const { data } = matter(text);
 
-    return Response.json({ posts });
+        return {
+          title: data.title || "Untitled",
+          slug: data.slug || file.public_id.split("/").pop(),
+          date: data.date || file.created_at,
+          excerpt: data.excerpt || "",
+          featuredImage: data.featuredImage || "",
+          url: file.secure_url,
+        };
+      })
+    );
+
+    return NextResponse.json({ success: true, posts });
   } catch (error) {
-    console.error("Error listing posts:", error);
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error("❌ Error fetching posts from Cloudinary:", error);
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500 }
+    );
   }
 }
