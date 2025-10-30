@@ -20,6 +20,25 @@ export default function EditPostPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
+  // ✅ Enable formatted HTML paste inside textareas
+  useEffect(() => {
+    const textareas = document.querySelectorAll("textarea");
+    textareas.forEach((ta) => {
+      ta.addEventListener("paste", (e) => {
+        if (e.clipboardData && e.clipboardData.getData("text/html")) {
+          e.preventDefault();
+          const html = e.clipboardData.getData("text/html");
+          const start = ta.selectionStart;
+          const end = ta.selectionEnd;
+          const before = ta.value.substring(0, start);
+          const after = ta.value.substring(end, ta.value.length);
+          ta.value = before + html + after;
+          ta.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      });
+    });
+  }, []);
+
   // ✅ Load existing post data
   useEffect(() => {
     async function fetchPost() {
@@ -66,40 +85,47 @@ export default function EditPostPage() {
 
       if (res.ok && data.url) {
         setForm((prev) => ({ ...prev, featuredImage: data.url }));
-        alert("✅ New image uploaded!");
+        showToast("✅ New image uploaded!");
       } else {
-        alert("❌ Image upload failed");
+        showToast("❌ Image upload failed");
       }
     } catch (err) {
       console.error("Upload failed:", err);
+      showToast("❌ Upload failed.");
     } finally {
       setUploading(false);
     }
   };
 
   // ✅ Handle form submission
-  // ✅ Handle form submission with toast + redirect
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  const updatedPost = { ...form, tags: form.tags.split(",").map((t) => t.trim()) };
+    const updatedPost = {
+      ...form,
+      tags: form.tags.split(",").map((t) => t.trim()),
+    };
 
-  const res = await fetch(`/api/blog/update?slug=${slug}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updatedPost),
-  });
+    try {
+      const res = await fetch(`/api/blog/update?slug=${slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedPost),
+      });
 
-  const data = await res.json();
+      const data = await res.json();
 
-  if (res.ok) {
-    showToast("✅ Post updated successfully!");
-    setTimeout(() => router.push("/admin/posts"), 1500);
-  } else {
-    showToast("❌ Failed to update post: " + (data.error || "Unknown error"));
-  }
-};
-
+      if (res.ok) {
+        showToast("✅ Post updated successfully!");
+        setTimeout(() => router.push("/admin/posts"), 1500);
+      } else {
+        showToast("❌ Failed to update post: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Something went wrong while updating.");
+    }
+  };
 
   if (loading) return <p className="text-center py-10">Loading post...</p>;
 
@@ -182,7 +208,7 @@ const handleSubmit = async (e) => {
           onChange={(e) => setForm({ ...form, content: e.target.value })}
           placeholder="Write content..."
           className="w-full border p-2 rounded"
-          rows={8}
+          rows={10}
         ></textarea>
 
         <button
@@ -194,6 +220,8 @@ const handleSubmit = async (e) => {
       </form>
     </div>
   );
+}
+
 // ✅ Toast notification helper
 function showToast(message) {
   const toast = document.createElement("div");
@@ -216,7 +244,4 @@ function showToast(message) {
     toast.style.opacity = "0";
     setTimeout(() => toast.remove(), 500);
   }, 2000);
-}
-
-
 }

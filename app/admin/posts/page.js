@@ -72,8 +72,10 @@ export default function AdminPosts() {
           </tr>
         </thead>
         <tbody>
-          {posts.map((post) => (
-            <tr key={post.slug} className="border-b hover:bg-gray-50">
+          {Array.from(
+  new Map(posts.map((p) => [p.slug, p])).values() // ✅ Deduplicate by slug
+).map((post, index) => (
+  <tr key={`${post.slug}-${index}`} className="border-b hover:bg-gray-50">
               <td className="p-3 font-medium">{post.title}</td>
               <td className="p-3 text-gray-600">{post.slug}</td>
               <td className="p-3 text-gray-500">
@@ -107,20 +109,27 @@ export default function AdminPosts() {
   );
 
   // ✅ Delete post
-  async function handleDelete(slug) {
-    if (!confirm("Are you sure you want to delete this post?")) return;
-    try {
-      const res = await fetch(`/api/blog/delete?slug=${slug}`, { method: "DELETE" });
-      const data = await res.json();
-      if (res.ok) {
-        alert("✅ Post deleted!");
-        setPosts((prev) => prev.filter((p) => p.slug !== slug));
-      } else {
-        alert("❌ Failed to delete post: " + (data.error || "Unknown error"));
-      }
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert("Error deleting post");
+  // ✅ Delete post
+async function handleDelete(slug) {
+  if (!confirm("Are you sure you want to delete this post?")) return;
+
+  try {
+    const res = await fetch(`/api/blog/${slug}`, { method: "DELETE" });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      alert("✅ Post deleted successfully!");
+      // Update state instantly so deleted post disappears
+      setPosts((prev) => prev.filter((p) => p.slug !== slug));
+    } else {
+      alert("❌ Failed to delete post: " + (data.message || "Unknown error"));
     }
+  } catch (err) {
+    console.error("Delete error:", err);
+    alert("Error deleting post: " + err.message);
   }
 }
+
+    }
+  
+

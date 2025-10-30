@@ -14,9 +14,16 @@ export async function PUT(req) {
       return Response.json({ error: "Slug required" }, { status: 400 });
 
     const data = await req.json();
-    const tagsArray = (data.tags || "").split(",").map((t) => t.trim());
 
-    const frontmatter = `---
+    // ✅ Safely handle tags whether string, array, or empty
+    let tagsArray = [];
+    if (Array.isArray(data.tags)) {
+      tagsArray = data.tags;
+    } else if (typeof data.tags === "string" && data.tags.trim() !== "") {
+      tagsArray = data.tags.split(",").map((t) => t.trim());
+    }
+
+    const frontmatter = `--- 
 title: "${data.title}"
 slug: "${data.slug}"
 date: "${new Date().toISOString().split("T")[0]}"
@@ -25,6 +32,7 @@ excerpt: "${data.excerpt || ""}"
 category: "${data.category || ""}"
 tags: ${JSON.stringify(tagsArray)}
 featuredImage: "${data.featuredImage || ""}"
+featuredAlt: "${data.featuredAlt || ""}"
 ---
 
 ${data.content}
@@ -37,13 +45,16 @@ ${data.content}
         folder: "format-pilot/posts",
         public_id: slug,
         resource_type: "raw",
-        overwrite: true, // this replaces existing post
+        overwrite: true, // replace existing file
+        invalidate: true,
+        use_filename: true,
+        unique_filename: false,
       }
     );
 
     return Response.json({
       success: true,
-      message: "Post updated successfully",
+      message: "✅ Post updated successfully",
       url: uploadResult.secure_url,
     });
   } catch (error) {

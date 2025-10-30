@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import "react-markdown-editor-lite/lib/index.css";
 import MarkdownIt from "markdown-it";
@@ -21,6 +21,32 @@ export default function Dashboard() {
   const [featuredImage, setFeaturedImage] = useState(null);
   const [featuredAlt, setFeaturedAlt] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  // ✅ Enable formatted HTML paste inside Markdown editor
+  useEffect(() => {
+    const editorElement = document.querySelector(".rc-md-editor");
+    if (!editorElement) return;
+
+    const handlePaste = (e) => {
+      if (e.clipboardData && e.clipboardData.getData("text/html")) {
+        e.preventDefault();
+        const html = e.clipboardData.getData("text/html");
+        const textArea = editorElement.querySelector("textarea");
+        if (textArea) {
+          const start = textArea.selectionStart;
+          const end = textArea.selectionEnd;
+          const before = textArea.value.substring(0, start);
+          const after = textArea.value.substring(end, textArea.value.length);
+          textArea.value = before + html + after;
+          textArea.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
+    };
+
+    editorElement.addEventListener("paste", handlePaste);
+    return () => editorElement.removeEventListener("paste", handlePaste);
+  }, []);
 
   // ✅ Handle image upload
   const handleImageChange = async (e) => {
@@ -49,10 +75,13 @@ export default function Dashboard() {
     }
   };
 
-  // ✅ Handle blog submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+// ✅ Handle blog submission (fixed)
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setPublishing(true);
 
+  try {
+    // Build payload explicitly (no reliance on name= attributes)
     const formData = new FormData();
     formData.append("title", title);
     formData.append("slug", slug);
@@ -61,53 +90,63 @@ export default function Dashboard() {
     formData.append("tags", tags);
     formData.append("category", category);
     formData.append("content", content);
-
     if (featuredImage) {
       formData.append("featuredImage", featuredImage);
       formData.append("featuredAlt", featuredAlt);
     }
 
-    try {
-      const res = await fetch("/api/blog/new", {
-        method: "POST",
-        body: formData,
-      });
+    const res = await fetch("/api/blog/new", {
+      method: "POST",
+      body: formData,
+    });
 
-      const result = await res.json();
+    // Try to parse JSON safely even for non-2xx
+    let result = {};
+    try { result = await res.json(); } catch {}
 
-      if (result.success) {
-        showToast("✅ Blog created successfully!");
-        setTitle("");
-        setSlug("");
-        setAuthor("");
-        setExcerpt("");
-        setTags("");
-        setCategory("");
-        setContent("");
-        setFeaturedImage(null);
-        setFeaturedAlt("");
+    if (res.ok && result?.success) {
+      showToast("✅ Blog created successfully!");
 
-        setTimeout(() => {
-          window.location.href = "/admin/posts";
-        }, 1500);
-      } else {
-        showToast("❌ Failed to publish: " + (result.error || "Unknown error"));
-      }
-    } catch (err) {
-      console.error(err);
-      showToast("❌ Something went wrong while publishing.");
+      // Reset state
+      setTitle("");
+      setSlug("");
+      setAuthor("");
+      setExcerpt("");
+      setTags("");
+      setCategory("");
+      setContent("");
+      setFeaturedImage(null);
+      setFeaturedAlt("");
+
+      // Reset the form visually
+      e.target.reset();
+
+      // Ensure editor shows blank
+      setTimeout(() => setContent(""), 50);
+
+      // Redirect
+      setTimeout(() => { window.location.href = "/admin/posts"; }, 1500);
+    } else {
+      const errMsg = result?.message || result?.error || `HTTP ${res.status}`;
+      showToast("❌ Failed to publish: " + errMsg);
     }
-  };
+  } catch (err) {
+    console.error(err);
+    showToast("❌ Something went wrong while publishing: " + (err.message || "Unknown error"));
+  } finally {
+    setPublishing(false);
+  }
+};
+
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      {/* ✅ Header fixed (no duplicate) */}
+      {/* ✅ Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <span>📝</span> Create New Blog Post
         </h1>
 
-        {/* ✅ Force white text to override global `a { color: ... }` */}
         <a
           href="/admin/posts"
           className="px-5 py-2.5 rounded-lg font-medium shadow
@@ -121,7 +160,7 @@ export default function Dashboard() {
         </a>
       </div>
 
-      {/* ✅ Form section */}
+      {/* ✅ Blog Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
         <input
           type="text"
@@ -227,10 +266,14 @@ export default function Dashboard() {
 
         <button
           type="submit"
-          className="bg-indigo-600 !text-white px-6 py-3 rounded hover:bg-indigo-700 transition"
-          style={{ color: "#fff" }}
+          disabled={publishing}
+          className={`px-6 py-3 rounded text-white transition ${
+            publishing
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
         >
-          Publish Blog
+          {publishing ? "Publishing..." : "Publish Blog"}
         </button>
       </form>
     </div>
