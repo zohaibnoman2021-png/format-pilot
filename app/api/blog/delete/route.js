@@ -11,20 +11,17 @@ export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
-
-    if (!slug) {
+    if (!slug)
       return NextResponse.json({ success: false, message: "Missing slug" }, { status: 400 });
-    }
 
-    // ✅ Delete the .md file from Cloudinary
     const publicId = `format-pilot/posts/${slug}`;
     const result = await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
 
     if (result.result !== "ok") {
-      return NextResponse.json({ success: false, message: "Failed to delete file on Cloudinary" }, { status: 400 });
+      console.error("Delete failed:", result);
+      return NextResponse.json({ success: false, message: "Failed to delete on Cloudinary" }, { status: 400 });
     }
 
-    console.log(`✅ Deleted post: ${slug}`);
     return NextResponse.json({ success: true, message: "Post deleted successfully" });
   } catch (error) {
     console.error("❌ Error deleting post:", error);

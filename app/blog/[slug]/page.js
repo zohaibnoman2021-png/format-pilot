@@ -1,28 +1,34 @@
-import { headers } from "next/headers";
+import { v2 as cloudinary } from "cloudinary";
+import matter from "gray-matter";
+import ReactMarkdown from "react-markdown";
 import BlogSidebar from "../../components/BlogSidebar";
 
-// ✅ Build full base URL that works in dev & production (now async)
-async function getBaseUrl() {
-  const h = await headers(); // must be awaited in Next.js 15+
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  return `${proto}://${host}`;
-}
+export const revalidate = 0; // Always serve live Cloudinary content
 
-// ✅ Fetch post data by slug from your API
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 async function getPostData(slug) {
-  const baseUrl = await getBaseUrl(); // now await properly
-  const res = await fetch(`${baseUrl}/api/blog`, {
-    next: { revalidate: 60 }, // revalidate every 60 seconds
-  });
+  // ✅ Build Cloudinary URL for this post
+  const fileUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/raw/upload/format-pilot/posts/${slug}.md`;
 
-  if (!res.ok) throw new Error("Failed to fetch posts");
+  // ✅ Fetch the markdown file
+  const res = await fetch(fileUrl, { cache: "no-store" });
+  if (!res.ok) return null;
 
-  const posts = await res.json();
-  return posts.find((p) => p.slug === slug);
+  // ✅ Parse Markdown + frontmatter
+  const text = await res.text();
+  const { data, content } = matter(text);
+
+  return {
+    ...data,
+    content,
+    slug,
+  };
 }
-
-export const revalidate = 60; // ISR - refresh every 60s
 
 export default async function BlogPostPage({ params }) {
   const post = await getPostData(params.slug);
@@ -54,11 +60,7 @@ export default async function BlogPostPage({ params }) {
           {new Date(post.date).toLocaleDateString()} • {post.author || "Admin"}
         </p>
 
-        <div
-          dangerouslySetInnerHTML={{
-            __html: post.content || "<p>Coming soon...</p>",
-          }}
-        />
+        <ReactMarkdown>{post.content}</ReactMarkdown>
       </article>
 
       {/* 🧭 Sidebar */}

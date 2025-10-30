@@ -1,19 +1,20 @@
-import fs from "fs";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function PUT(req) {
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug");
-    if (!slug) return Response.json({ error: "Slug required" }, { status: 400 });
+    if (!slug)
+      return Response.json({ error: "Slug required" }, { status: 400 });
 
     const data = await req.json();
-    const filePath = path.join(process.cwd(), "content", "blog", `${slug}.md`);
-
-    if (!fs.existsSync(filePath))
-      return Response.json({ error: "Post not found" }, { status: 404 });
-
-    const tagsArray = (data.tags || []).map((t) => t.trim());
+    const tagsArray = (data.tags || "").split(",").map((t) => t.trim());
 
     const frontmatter = `---
 title: "${data.title}"
@@ -29,11 +30,24 @@ featuredImage: "${data.featuredImage || ""}"
 ${data.content}
 `;
 
-    fs.writeFileSync(filePath, frontmatter, "utf8");
+    // ✅ Upload (overwrite) the Markdown file in Cloudinary
+    const uploadResult = await cloudinary.uploader.upload(
+      `data:text/markdown;base64,${Buffer.from(frontmatter).toString("base64")}`,
+      {
+        folder: "format-pilot/posts",
+        public_id: slug,
+        resource_type: "raw",
+        overwrite: true, // this replaces existing post
+      }
+    );
 
-    return Response.json({ success: true, message: "Post updated successfully" });
+    return Response.json({
+      success: true,
+      message: "Post updated successfully",
+      url: uploadResult.secure_url,
+    });
   } catch (error) {
-    console.error("Error updating post:", error);
+    console.error("❌ Error updating post:", error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 }

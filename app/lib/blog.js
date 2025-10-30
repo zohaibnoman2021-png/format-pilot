@@ -1,53 +1,71 @@
-import fs from "fs";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
 import matter from "gray-matter";
 
-// ✅ Define paths
-const ROOT = process.cwd();
-const BLOG_DIR = path.join(ROOT, "content", "blog");
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// ✅ Get metadata for all posts (used for blog listing and static paths)
-export function getAllPostsMeta() {
-  if (!fs.existsSync(BLOG_DIR)) return [];
+// ✅ Get metadata for all posts (from Cloudinary)
+export async function getAllPostsMeta() {
+  try {
+    const results = await cloudinary.search
+      .expression("resource_type:raw AND folder=format-pilot/posts")
+      .sort_by("created_at", "desc")
+      .max_results(100)
+      .execute();
 
-  const files = fs.readdirSync(BLOG_DIR).filter((f) => f.endsWith(".md"));
+    const posts = await Promise.all(
+      results.resources.map(async (file) => {
+        const res = await fetch(file.secure_url);
+        const text = await res.text();
+        const { data } = matter(text);
 
-  return files
-    .map((file) => {
-      const raw = fs.readFileSync(path.join(BLOG_DIR, file), "utf8");
-      const { data } = matter(raw);
+        return {
+          slug: data.slug || file.public_id.split("/").pop(),
+          title: data.title || "Untitled Post",
+          date: data.date || file.created_at,
+          excerpt: data.excerpt || "",
+          tags: data.tags || [],
+          author: data.author || "Admin",
+          category: data.category || "",
+          featuredImage: data.featuredImage || "",
+        };
+      })
+    );
 
-      return {
-        slug: data.slug || file.replace(/\.md$/, ""),
-        title: data.title || "Untitled Post",
-        date: data.date || new Date().toISOString(),
-        excerpt: data.excerpt || "",
-        tags: data.tags || [],
-        author: data.author || "Admin",
-        category: data.category || "",
-        featuredImage: data.featuredImage || "", // ✅ Make sure image path comes through
-      };
-    })
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    return posts.sort((a, b) => new Date(b.date) - new Date(a.date));
+  } catch (error) {
+    console.error("❌ Error fetching posts from Cloudinary:", error);
+    return [];
+  }
 }
 
-// ✅ Get full post content by slug (used for individual blog pages)
-export function getPostBySlug(slug) {
-  const filePath = path.join(BLOG_DIR, `${slug}.md`);
-  if (!fs.existsSync(filePath)) return null;
+// ✅ Get full post content by slug (from Cloudinary)
+export async function getPostBySlug(slug) {
+  try {
+    const url = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/raw/upload/format-pilot/posts/${slug}.md`;
 
-  const raw = fs.readFileSync(filePath, "utf8");
-  const { data, content } = matter(raw);
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
 
-  return {
-    slug: data.slug || slug,
-    title: data.title || "Untitled Post",
-    date: data.date || new Date().toISOString(),
-    excerpt: data.excerpt || "",
-    tags: data.tags || [],
-    author: data.author || "Admin",
-    category: data.category || "",
-    featuredImage: data.featuredImage || "", // ✅ Image link from Cloudinary
-    content,
-  };
+    const text = await res.text();
+    const { data, content } = matter(text);
+
+    return {
+      slug: data.slug || slug,
+      title: data.title || "Untitled Post",
+      date: data.date || new Date().toISOString(),
+      excerpt: data.excerpt || "",
+      tags: data.tags || [],
+      author: data.author || "Admin",
+      category: data.category || "",
+      featuredImage: data.featuredImage || "",
+      content,
+    };
+  } catch (error) {
+    console.error("❌ Error fetching post from Cloudinary:", error);
+    return null;
+  }
 }
