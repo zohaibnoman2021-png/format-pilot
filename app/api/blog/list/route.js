@@ -10,17 +10,15 @@ cloudinary.config({
 
 export async function GET() {
   try {
-    // ✅ Fetch all Markdown files in your Cloudinary folder
     const results = await cloudinary.search
       .expression("resource_type:raw AND folder=format-pilot/posts")
       .sort_by("created_at", "desc")
       .max_results(100)
       .execute();
 
-    // ✅ Parse front matter for each Markdown file
     const posts = await Promise.all(
       results.resources.map(async (file) => {
-        const res = await fetch(file.secure_url);
+        const res = await fetch(file.secure_url, { cache: "no-store" });
         const text = await res.text();
         const { data } = matter(text);
 
@@ -29,7 +27,9 @@ export async function GET() {
           slug: data.slug || file.public_id.split("/").pop(),
           date: data.date || file.created_at,
           excerpt: data.excerpt || "",
+          author: data.author || "Admin",
           featuredImage: data.featuredImage || "",
+          featuredAlt: data.featuredAlt || "",
           url: file.secure_url,
         };
       })
@@ -37,7 +37,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, posts });
   } catch (error) {
-    console.error("❌ Error fetching posts from Cloudinary:", error);
+    console.error("❌ Error fetching posts:", error);
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500 }
