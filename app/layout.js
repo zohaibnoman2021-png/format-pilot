@@ -49,6 +49,7 @@ export default function RootLayout({ children }) {
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
         />
         <meta charSet="UTF-8" />
+        <meta name="google-site-verification" content="UzRhmXsU_HSDGpkd3WAw6yU22EmtIpG3ewkEBV1t1PA" />
       </head>
 
       <body className="bg-gray-50 text-gray-900 antialiased dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
