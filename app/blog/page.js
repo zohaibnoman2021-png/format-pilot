@@ -5,11 +5,23 @@ export const revalidate = 60;
 
 export const metadata = {
   title: "Blog | Format Pilot",
-  description: "Tutorials, updates, and guides for data formatting and text utilities.",
+  description:
+    "Tutorials, updates, and guides for data formatting and text utilities.",
 };
 
+// ✅ HTML decoding helper — handles single & double-escaped HTML
+function decodeHTML(str = "") {
+  if (!str) return "";
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
 export default async function BlogIndex() {
-  const posts = await getAllPostsMeta(); // now async Cloudinary call
+  const posts = await getAllPostsMeta();
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -28,6 +40,7 @@ export default async function BlogIndex() {
               href={`/blog/${post.slug}`}
               className="block bg-white rounded-xl border border-gray-200 p-5 hover:shadow transition"
             >
+              {/* 🖼️ Featured Image */}
               {post.featuredImage && (
                 <img
                   src={post.featuredImage}
@@ -36,14 +49,32 @@ export default async function BlogIndex() {
                   loading="lazy"
                 />
               )}
+
+              {/* 🏷️ Title */}
               <h2 className="text-xl font-semibold text-indigo-600">
                 {post.title}
               </h2>
+
+              {/* 👤 Date & Author */}
               <p className="text-sm text-gray-500 mt-1">
                 {new Date(post.date).toLocaleDateString()} •{" "}
                 {post.author || "Admin"}
               </p>
-              <p className="text-gray-600 mt-3">{post.excerpt}</p>
+
+              {/* ✍️ Formatted HTML Excerpt */}
+              <div
+                className="text-gray-700 text-sm mt-3 line-clamp-3 prose max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: decodeHTML(
+                    post.excerpt ||
+                      post.content
+                        ?.substring(0, 300)
+                        ?.replace(/&lt;/g, "<")
+                        ?.replace(/&gt;/g, ">")
+                        ?.replace(/&amp;/g, "&")
+                  ),
+                }}
+              />
             </Link>
           ))}
         </div>
