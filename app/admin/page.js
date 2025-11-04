@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
+import "react-quill-new/dist/quill.snow.css";
+
+// ✅ React 19-safe import for rich HTML editing
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 export default function Dashboard() {
   const [title, setTitle] = useState("");
@@ -11,67 +16,109 @@ export default function Dashboard() {
   const [category, setCategory] = useState("");
   const [content, setContent] = useState("");
   const [featuredImage, setFeaturedImage] = useState(null);
+  const [featuredAlt, setFeaturedAlt] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
+  // 🖼️ Handle image upload
   const handleImageChange = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
 
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
 
-    const data = await res.json();
-
-    if (data.url) {
-      setFeaturedImage(data.url);
-      alert("✅ Image uploaded successfully!");
-    } else {
-      alert("❌ Upload failed: " + data.error);
+      if (res.ok && data.url) {
+        setFeaturedImage(data.url);
+        showToast("✅ Image uploaded successfully!");
+      } else {
+        showToast("❌ Upload failed: " + (data?.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Upload failed.");
+    } finally {
+      setUploading(false);
     }
   };
 
+  // 🧠 Handle blog submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setPublishing(true);
 
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("slug", slug);
-    formData.append("author", author);
-    formData.append("excerpt", excerpt);
-    formData.append("tags", tags);
-    formData.append("category", category);
-    formData.append("content", content);
+    try {
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("slug", slug);
+      formData.append("author", author);
+      formData.append("excerpt", excerpt);
+      formData.append("tags", tags);
+      formData.append("category", category);
+      formData.append("content", content);
 
-    // ✅ FIXED: Send URL instead of File Blob
-    if (featuredImage) {
-      formData.append("featuredImage", featuredImage);
+      if (featuredImage) {
+        formData.append("featuredImage", featuredImage);
+        formData.append("featuredAlt", featuredAlt);
+      }
+
+      const res = await fetch("/api/blog/new", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await res.json().catch(() => ({}));
+
+      if (res.ok && result?.success) {
+        showToast("✅ Blog published successfully!");
+        resetForm();
+        setTimeout(() => (window.location.href = "/admin/posts"), 1500);
+      } else {
+        showToast("❌ Failed: " + (result?.message || result?.error || `HTTP ${res.status}`));
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Error: " + err.message);
+    } finally {
+      setPublishing(false);
     }
+  };
 
-    const res = await fetch("/api/blog/new", {
-      method: "POST",
-      body: formData,
-    });
-
-    const result = await res.json();
-    if (result.success) {
-      alert("✅ Blog post published successfully!");
-      console.log(result.post);
-    } else {
-      alert("❌ Failed to publish blog.");
-      console.error(result.error);
-    }
+  // 🔄 Reset form after publishing
+  const resetForm = () => {
+    setTitle("");
+    setSlug("");
+    setAuthor("");
+    setExcerpt("");
+    setTags("");
+    setCategory("");
+    setContent("");
+    setFeaturedImage(null);
+    setFeaturedAlt("");
   };
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      <h1 className="text-3xl font-bold mb-6">📝 Create New Blog Post</h1>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          📝 Create New Blog Post
+        </h1>
+        <a
+          href="/admin/posts"
+          className="px-5 py-2.5 rounded-lg font-medium shadow bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+        >
+          View All Blogs
+        </a>
+      </div>
 
+      {/* Blog Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Title */}
         <input
           type="text"
           placeholder="Post Title"
@@ -81,7 +128,6 @@ export default function Dashboard() {
           required
         />
 
-        {/* Slug */}
         <input
           type="text"
           placeholder="Slug (e.g. my-first-post)"
@@ -91,7 +137,6 @@ export default function Dashboard() {
           required
         />
 
-        {/* Author */}
         <input
           type="text"
           placeholder="Author"
@@ -100,16 +145,14 @@ export default function Dashboard() {
           className="w-full border p-2 rounded"
         />
 
-        {/* Excerpt */}
         <textarea
           placeholder="Short excerpt..."
           value={excerpt}
           onChange={(e) => setExcerpt(e.target.value)}
           className="w-full border p-2 rounded"
           rows={3}
-        ></textarea>
+        />
 
-        {/* Category */}
         <input
           type="text"
           placeholder="Category (e.g. Data Tools)"
@@ -118,7 +161,6 @@ export default function Dashboard() {
           className="w-full border p-2 rounded"
         />
 
-        {/* Tags */}
         <input
           type="text"
           placeholder="Tags (comma separated)"
@@ -130,46 +172,91 @@ export default function Dashboard() {
         {/* Featured Image */}
         <div>
           <label className="block font-medium mb-2">Featured Image</label>
-          <div className="flex items-center gap-3">
+          <label className="inline-flex items-center px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer">
+            {uploading ? "Uploading..." : "Upload Image"}
             <input
               type="file"
-              id="fileUpload"
               accept="image/*"
               onChange={handleImageChange}
               className="hidden"
+              disabled={uploading}
             />
-            <label
-              htmlFor="fileUpload"
-              className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition"
-            >
-              📤 Upload Featured Image
-            </label>
-            {featuredImage && (
-              <img
-                src={featuredImage}
-                alt="Preview"
-                className="w-16 h-16 object-cover rounded border border-gray-300"
-              />
-            )}
-          </div>
+          </label>
+
+          {featuredImage && (
+            <img
+              src={featuredImage}
+              alt={featuredAlt || "Preview"}
+              className="mt-4 w-48 h-32 object-cover rounded border"
+            />
+          )}
         </div>
 
-        {/* Content */}
-        <textarea
-          placeholder="Write your content here..."
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
+        <input
+          type="text"
+          placeholder="Image description (for accessibility)"
+          value={featuredAlt}
+          onChange={(e) => setFeaturedAlt(e.target.value)}
           className="w-full border p-2 rounded"
-          rows={8}
-        ></textarea>
+        />
+
+        {/* React Quill Editor */}
+        <div className="mt-6">
+          <label className="block font-medium mb-2">Content</label>
+          <ReactQuill
+            theme="snow"
+            value={content}
+            onChange={setContent}
+            placeholder="Write or paste your HTML blog content here..."
+            className="bg-white border rounded"
+            modules={{
+              toolbar: [
+                [{ header: [1, 2, 3, false] }],
+                ["bold", "italic", "underline", "strike"],
+                [{ list: "ordered" }, { list: "bullet" }],
+                ["blockquote", "code-block"],
+                ["link", "image", "clean"],
+              ],
+            }}
+          />
+        </div>
 
         <button
           type="submit"
-          className="bg-indigo-600 text-white px-5 py-2 rounded hover:bg-indigo-700"
+          disabled={publishing}
+          className={`px-6 py-3 rounded text-white transition ${
+            publishing
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
         >
-          Publish Blog
+          {publishing ? "Publishing..." : "Publish Blog"}
         </button>
       </form>
     </div>
   );
+}
+
+// ✅ Toast helper
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.innerText = message;
+  toast.style.position = "fixed";
+  toast.style.bottom = "20px";
+  toast.style.right = "20px";
+  toast.style.background = "#4f46e5";
+  toast.style.color = "white";
+  toast.style.padding = "10px 16px";
+  toast.style.borderRadius = "6px";
+  toast.style.fontSize = "14px";
+  toast.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+  toast.style.zIndex = "9999";
+  toast.style.transition = "opacity 0.3s ease";
+  toast.style.opacity = "1";
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 500);
+  }, 2000);
 }

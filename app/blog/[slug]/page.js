@@ -1,9 +1,19 @@
 import { v2 as cloudinary } from "cloudinary";
 import matter from "gray-matter";
-import ReactMarkdown from "react-markdown";
 import BlogSidebar from "../../components/BlogSidebar";
 
-export const revalidate = 0; // Always serve live Cloudinary content
+// ✅ Decode escaped HTML so <h1> and <p> render correctly
+function decodeHTMLEntities(text) {
+  if (!text) return text;
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'");
+}
+
+export const revalidate = 0; // Always serve fresh Cloudinary content
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,15 +21,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// ✅ Fetch and parse a single post from Cloudinary
 async function getPostData(slug) {
-  // ✅ Build Cloudinary URL for this post
   const fileUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/raw/upload/format-pilot/posts/${slug}.md`;
 
-  // ✅ Fetch the markdown file
   const res = await fetch(fileUrl, { cache: "no-store" });
   if (!res.ok) return null;
 
-  // ✅ Parse Markdown + frontmatter
   const text = await res.text();
   const { data, content } = matter(text);
 
@@ -30,8 +38,11 @@ async function getPostData(slug) {
   };
 }
 
+// ✅ Main Blog Post Page
 export default async function BlogPostPage({ params }) {
-  const post = await getPostData(params.slug);
+  // Fix: Await params in Next.js 15+
+  const { slug } = await params;
+  const post = await getPostData(slug);
 
   if (!post) {
     return (
@@ -60,7 +71,13 @@ export default async function BlogPostPage({ params }) {
           {new Date(post.date).toLocaleDateString()} • {post.author || "Admin"}
         </p>
 
-        <ReactMarkdown>{post.content}</ReactMarkdown>
+        {/* ✅ Decode HTML entities and render as true HTML */}
+        <div
+          className="prose max-w-none"
+          dangerouslySetInnerHTML={{
+            __html: decodeHTMLEntities(post.content),
+          }}
+        />
       </article>
 
       {/* 🧭 Sidebar */}

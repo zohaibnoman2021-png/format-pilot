@@ -2,6 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import "react-markdown-editor-lite/lib/index.css";
+import MarkdownIt from "markdown-it";
+
+// ✅ Enable HTML rendering in Markdown preview
+const mdParser = new MarkdownIt({ html: true });
+
+// ✅ Dynamically load Markdown editor (SSR-safe)
+const MdEditor = dynamic(() => import("react-markdown-editor-lite"), {
+  ssr: false,
+});
 
 export default function EditPostPage() {
   const { slug } = useParams();
@@ -19,25 +30,7 @@ export default function EditPostPage() {
   });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-
-  // ✅ Enable formatted HTML paste inside textareas
-  useEffect(() => {
-    const textareas = document.querySelectorAll("textarea");
-    textareas.forEach((ta) => {
-      ta.addEventListener("paste", (e) => {
-        if (e.clipboardData && e.clipboardData.getData("text/html")) {
-          e.preventDefault();
-          const html = e.clipboardData.getData("text/html");
-          const start = ta.selectionStart;
-          const end = ta.selectionEnd;
-          const before = ta.value.substring(0, start);
-          const after = ta.value.substring(end, ta.value.length);
-          ta.value = before + html + after;
-          ta.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-      });
-    });
-  }, []);
+  const [updating, setUpdating] = useState(false);
 
   // ✅ Load existing post data
   useEffect(() => {
@@ -57,12 +50,12 @@ export default function EditPostPage() {
             featuredImage: data.post.featuredImage || "",
           });
         } else {
-          alert("⚠️ Post not found");
+          showToast("⚠️ Post not found");
           router.push("/admin/posts");
         }
       } catch (err) {
         console.error("Error fetching post:", err);
-        alert("Error loading post");
+        showToast("❌ Error loading post");
       } finally {
         setLoading(false);
       }
@@ -100,6 +93,7 @@ export default function EditPostPage() {
   // ✅ Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setUpdating(true);
 
     const updatedPost = {
       ...form,
@@ -124,6 +118,8 @@ export default function EditPostPage() {
     } catch (err) {
       console.error(err);
       showToast("❌ Something went wrong while updating.");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -203,19 +199,37 @@ export default function EditPostPage() {
           )}
         </div>
 
-        <textarea
-          value={form.content}
-          onChange={(e) => setForm({ ...form, content: e.target.value })}
-          placeholder="Write content..."
-          className="w-full border p-2 rounded"
-          rows={10}
-        ></textarea>
+        {/* ✅ Markdown Editor with HTML preview */}
+        <div className="mt-6">
+          <label className="block font-medium mb-2">Content</label>
+          <MdEditor
+            value={form.content}
+            style={{ height: "500px" }}
+            renderHTML={(text) => mdParser.render(text)}
+            onChange={({ text }) => setForm({ ...form, content: text })}
+            onImageUpload={async (file) => {
+              const formData = new FormData();
+              formData.append("file", file);
+              const res = await fetch("/api/upload", {
+                method: "POST",
+                body: formData,
+              });
+              const data = await res.json();
+              return data.url;
+            }}
+          />
+        </div>
 
         <button
           type="submit"
-          className="bg-indigo-600 text-white px-5 py-2 rounded hover:bg-indigo-700"
+          disabled={updating}
+          className={`px-6 py-3 rounded text-white transition ${
+            updating
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
         >
-          Update Post
+          {updating ? "Updating..." : "Update Post"}
         </button>
       </form>
     </div>
