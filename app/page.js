@@ -1,4 +1,10 @@
 import Link from "next/link";
+export const metadata = {
+  title: "Free Online File Converter and Simple Text Tools You’ll Love",
+  description:
+    "Online file converter with free text tools to format JSON, XML, count words, and change text case easily. Fast, simple, and no signup required.",
+};
+
 
 export default function Home() {
   return (
@@ -60,6 +66,7 @@ export default function Home() {
           </Link>
         ))}
       </section>
+
            {/* ================= SEO CONTENT PART 1 ================= */}
       <section className="px-6 max-w-5xl mx-auto pb-24">
         <div className="space-y-6">
@@ -442,6 +449,7 @@ export default function Home() {
         </div>
       </section>
       {/* ================= END PART 4 ================= */}
+
       {/* ================= SEO CONTENT PART 5 ================= */}
       <section className="px-6 max-w-5xl mx-auto pb-24">
         <div className="space-y-10">
@@ -774,9 +782,9 @@ export default function Home() {
               </div>
 
               <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                  No downloads or installations
-                </h3>
+         <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+  No downloads or installations
+</h3>
                 <p className="mt-3 text-gray-700 dark:text-gray-300 leading-relaxed">
                   Installing software for occasional tasks can clutter your system and waste time. Online tools provide a more flexible solution.
                 </p>
@@ -801,6 +809,7 @@ export default function Home() {
         </div>
       </section>
       {/* ================= END PART 5 ================= */}
+    
 
     </main>
   );
